@@ -1,0 +1,36 @@
+name,value,unit,source
+time_limit_per_case,60,s,docs/Project03_update.pdf (execution time limit per test case)
+sa_hard_cap,45,s,M11515075/src/Annealer.h kHardCapSec
+stage1_deadline,10,s,M11515075/src/main.cpp kStage1Deadline
+postpass_max_rounds,20,rounds,M11515075/src/Legalizer.cpp kMaxRounds
+postpass_min_total_gain,0.1,%,M11515075/src/Legalizer.cpp kMinRoundGain (1e-3)
+postpass_min_max_gain,1,%,M11515075/src/Legalizer.cpp kMinRoundMaxGain (1e-2)
+postpass_max_rows,40,rows,M11515075/src/Legalizer.cpp kPostPassMaxRows
+postpass_max_scan,64,per direction,M11515075/src/Legalizer.cpp kPostPassMaxScan
+t0_accept,1,%,M11515075/src/Annealer.h kInitAcceptProb (0.01)
+alpha_high,0.5,,M11515075/src/Annealer.cpp cooling rule (acceptance > 96%)
+alpha_mid,0.9,,M11515075/src/Annealer.cpp cooling rule (acceptance > 80%)
+alpha_band,0.95,,M11515075/src/Annealer.cpp cooling rule (acceptance > 15%)
+alpha_low,0.95,,M11515075/src/Annealer.h kLowAcceptAlpha (acceptance <= 15%)
+alpha_low_threshold,15,%,M11515075/src/Annealer.cpp cooling rule
+frozen_ratio,1e-4,T/T0,M11515075/src/Annealer.h kFrozenTempRatio
+window_init,10,% of chip,M11515075/src/Annealer.cpp initial range window
+window_target_accept,44,%,M11515075/src/Annealer.cpp range-window update
+moves_per_cell,20,per step,M11515075/src/Annealer.h kMovesPerCellPerStep
+target_steps,150,steps,M11515075/src/Annealer.h kTargetSteps
+early_stop_accept,5,%,M11515075/src/Annealer.h kEarlyStopAcceptRate
+early_stop_gain,0.01,%,M11515075/src/Annealer.h kEarlyStopRelImprove (1e-4)
+early_stop_steps,5,steps,M11515075/src/Annealer.h kEarlyStopPatience
+early_stop_moves_per_cell,10,moves/cell,M11515075/src/Annealer.h kEarlyStopPatienceMovesPerCell
+incremental_min_degree,12,pins,M11515075/src/Annealer.h kIncrementalMinDegree
+mix_optimal,40,%,M11515075/src/Annealer.h kPOptimal
+mix_random,20,%,M11515075/src/Annealer.h kPRandom - kPOptimal
+mix_adjacent,20,%,M11515075/src/Annealer.h kPAdjacent - kPRandom
+mix_shift,20,%,M11515075/src/Annealer.h 1 - kPAdjacent
+seed,1,,M11515075/src/Annealer.h SaOptions::seed; tools/convert_ibm.py --seed
+noise_mild_rows,1,rows,tools/convert_ibm.py --sigma-rows (input001-006)
+noise_mild_sites,10,sites,tools/convert_ibm.py --sigma-sites (input001-006)
+noise_harsh_rows,3,rows,tools/convert_ibm.py --sigma-rows (input007-012)
+noise_harsh_sites,30,sites,tools/convert_ibm.py --sigma-sites (input007-012)
+zoom_rows,8,rows,report/make_figures.sh --zoom 0 0 6600 4032 (row height 504)
+zoom_sites,100,sites,report/make_figures.sh --zoom 0 0 6600 4032 (site width 66)
