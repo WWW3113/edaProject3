@@ -12,8 +12,11 @@ constexpr double kHardCapSec = 45.0;            // SA stops by this time since p
 constexpr double kEarlyStopAcceptRate = 0.05;   // early stop only once acceptance is below this
 constexpr double kEarlyStopRelImprove = 1e-4;   // ... and best improved < 0.01% ...
 constexpr int kEarlyStopPatience = 5;           // ... over this many temperature steps
-constexpr double kInitAcceptProb = 0.2;         // uphill acceptance targeted by T0
-constexpr double kMovesPerCellPerStep = 10;     // moves per temperature step, per movable cell
+constexpr double kEarlyStopPatienceMovesPerCell = 10; // ... and at least this many moves per cell
+constexpr double kInitAcceptProb = 0.01;        // uphill acceptance targeted by T0
+constexpr double kInitWindowRows = 0;           // initial range window in rows (0: 10% of chip)
+constexpr double kLowAcceptAlpha = 0.95;        // cooling factor once acceptance < 15%
+constexpr double kMovesPerCellPerStep = 20;     // moves per temperature step, per movable cell
 constexpr double kMinMovesPerCellPerStep = 0.5; // lower bound when time is short
 constexpr int kTargetSteps = 150;               // steps the time budget should allow
 constexpr double kFrozenTempRatio = 1e-4;       // T/T0 regarded as frozen for scheduling
@@ -33,6 +36,11 @@ struct SaOptions {
     std::uint64_t seed = 1;
     std::string logPath;          // CSV log, empty = off
     long long logEvery = 0;       // 0 = automatic
+    double initAccept = sa_tuning::kInitAcceptProb;           // experiment override
+    double movesPerCell = sa_tuning::kMovesPerCellPerStep;    // experiment override
+    double initWindowRows = sa_tuning::kInitWindowRows;       // experiment override
+    double lowAlpha = sa_tuning::kLowAcceptAlpha;             // experiment override
+    int targetSteps = sa_tuning::kTargetSteps;                // experiment override
     bool verbose = false;
 };
 

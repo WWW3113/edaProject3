@@ -16,7 +16,9 @@ SRC_DIR holds BENCH.nodes/.nets/.wts and BENCH-VARIANT.pl/.scl, e.g.
   noise: sigma-rows row heights in y and sigma-sites site widths in x, so
   cells overlap and are off-row / off-site like a global placement.
   Terminal positions always come from the variant's .pl.
-Writes OUT_BASE.{aux,nodes,nets,wts,pl,scl}.
+Writes OUT_BASE.{aux,nodes,nets,wts,pl,scl}. With --gp it also writes
+OUT_BASE.ref.pl, the unperturbed --gp placement with the variant's
+terminals: a known legal solution that run_all.sh reports as a reference.
 """
 import argparse
 import os
@@ -100,6 +102,14 @@ def main():
             x = min(max(x, xs0), xs1 - nodes[n]["w"])
             y = min(max(y, ys[0]), ys[-1])
             g.write("%s\t%.2f\t%.2f\t: %s\n" % (n, x, y, orient))
+    if gp is not None:
+        # The unperturbed placement: a known legal solution for reference.
+        with open(a.out + ".ref.pl", "w") as g:
+            g.write("UCLA pl 1.0\n# reference: %s (unperturbed)\n\n" % os.path.basename(a.gp))
+            for n in order:
+                rec = pl[n] if nodes[n]["fixed"] or n in macros else gp[n]
+                tag = " " + " ".join(pl[n]["tags"]) if pl[n]["tags"] else ""
+                g.write("%s\t%s\t%s\t: %s%s\n" % (n, rec["xs"], rec["ys"], pl[n]["orient"] or "N", tag))
     with open(a.out + ".aux", "w") as g:
         g.write("RowBasedPlacement : %s.nodes %s.nets %s.wts %s.pl %s.scl\n" % ((bn,) * 5))
     print("%s <- %s-%s: %d movable, %d terminals, %d macros fixed%s"

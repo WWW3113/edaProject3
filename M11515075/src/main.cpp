@@ -16,7 +16,7 @@ namespace {
 
 // Stage 1's optional improvement passes stop at this time (seconds since
 // program start); legalization itself always runs to completion.
-constexpr double kStage1Deadline = 15.0;
+constexpr double kStage1Deadline = 10.0;
 
 struct Options {
     std::string in, out;
@@ -40,7 +40,12 @@ void usage(const char* prog) {
               << "  --iters N       fixed SA move budget; schedule ignores the clock\n"
               << "  --sa-cap S      SA stops S seconds after program start (default 45)\n"
               << "  --sa-log FILE   write SA progress CSV (also: env DP_SA_LOG)\n"
-              << "  --log-every N   CSV row every N attempted moves\n";
+              << "  --log-every N   CSV row every N attempted moves\n"
+              << "  --t0-accept P   (tuning) uphill acceptance targeted by T0\n"
+              << "  --moves-per-cell M  (tuning) moves per temperature step per cell\n"
+              << "  --win0 R        (tuning) initial range window in rows\n"
+              << "  --low-alpha A   (tuning) cooling factor below 15% acceptance\n"
+              << "  --target-steps N  (tuning) temperature steps the time budget aims for\n";
 }
 
 bool parseArgs(int argc, char** argv, Options& o) {
@@ -59,6 +64,11 @@ bool parseArgs(int argc, char** argv, Options& o) {
         else if (i + 1 < argc && a == "--sa-cap") o.saOpt.hardCap = std::atof(argv[++i]);
         else if (i + 1 < argc && a == "--sa-log") o.saOpt.logPath = argv[++i];
         else if (i + 1 < argc && a == "--log-every") o.saOpt.logEvery = std::atoll(argv[++i]);
+        else if (i + 1 < argc && a == "--t0-accept") o.saOpt.initAccept = std::atof(argv[++i]);
+        else if (i + 1 < argc && a == "--moves-per-cell") o.saOpt.movesPerCell = std::atof(argv[++i]);
+        else if (i + 1 < argc && a == "--win0") o.saOpt.initWindowRows = std::atof(argv[++i]);
+        else if (i + 1 < argc && a == "--low-alpha") o.saOpt.lowAlpha = std::atof(argv[++i]);
+        else if (i + 1 < argc && a == "--target-steps") o.saOpt.targetSteps = std::atoi(argv[++i]);
         else { std::cerr << "error: unknown option " << a << "\n"; return false; }
     }
     return true;

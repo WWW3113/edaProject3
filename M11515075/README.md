@@ -85,8 +85,8 @@ Total HPWL (SA): <num>
    minimizing Σ|x − x_gp| are found exactly by pool-adjacent-violators with
    block medians. A segment adopts them only if neither its maximum nor its
    total displacement grows.
-4. **Post-pass rounds** (up to 8, stop when a round gains < 0.3 % of D_total
-   and < 1 % of D_max, or at 15 s after program start):
+4. **Post-pass rounds** (up to 20, stop when a round gains < 0.1 % of D_total
+   and < 1 % of D_max, or at 10 s after program start):
    * *reduce max*: repeatedly take the currently worst cell and move it to the
      free gap with the smallest displacement, or swap it with an equal-width
      cell so that the pair's larger displacement drops; stop when the worst
@@ -115,16 +115,20 @@ Total HPWL (SA): <num>
   pins on each edge; a move only touches the nets of the moved cells, and a
   box is recomputed from scratch only when an edge loses its last pin (or
   for nets with fewer than 12 pins, where recomputing is cheaper).
-* **Schedule**: T0 is set so that about 20 % of sampled uphill moves would be
-  accepted. Cooling follows the VPR rule (α = 0.5 / 0.9 / 0.95 / 0.8 by
-  acceptance rate). It is sped up when needed so that T reaches 1e-4·T0 by
-  the 45 s cap. The range window shrinks or grows with the acceptance rate
-  (target 44 %). The moves per step are 10 × #cells, reduced on large designs
-  so about 150 steps fit in the time budget. Moves with zero HPWL change are
-  accepted but do not count toward the acceptance rate.
+* **Schedule**: T0 is set so that about 1 % of sampled uphill moves would be
+  accepted (the start is already a good legal placement). Cooling follows a
+  VPR-style rule (α = 0.5 / 0.9 / 0.95 / 0.95 for acceptance > 96 % / > 80 % /
+  > 15 % / below). It is sped up when needed so that T reaches 1e-4·T0 by the
+  45 s cap. The range window starts at 10 % of the chip and shrinks or grows
+  with the acceptance rate (target 44 %). The moves per step are 20 × #cells,
+  reduced on large designs so about 150 steps fit in the time budget. Moves
+  with zero HPWL change are accepted but do not count toward the acceptance
+  rate.
 * **Stopping**: hard cap at 45 s after program start, or early when the
   acceptance rate is below 5 % and best-so-far improved by less than
-  0.01 % over the last 5 steps. All knobs are constants in `Annealer.h`.
+  0.01 % over the last 5 steps and at least 10 moves per cell. All knobs are
+  constants in `Annealer.h`; `--t0-accept`, `--moves-per-cell`, `--win0`,
+  `--low-alpha` and `--target-steps` override some of them for experiments.
 * **Best-so-far**: an undo journal records each cell changed since the last
   snapshot (once per cell, via a dirty flag). Whenever current HPWL beats
   the best, only those cells are copied into the stored best placement, so

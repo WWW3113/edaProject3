@@ -13,8 +13,10 @@ namespace {
 
 constexpr double kInf = std::numeric_limits<double>::infinity();
 constexpr double kEps = 1e-9;
-constexpr int kMaxRounds = 8;             // post-pass rounds in Stage 1
-constexpr double kMinRoundGain = 3e-3;    // stop when a round gains < 0.3% D_total
+constexpr int kMaxRounds = 20;            // post-pass rounds in Stage 1
+constexpr double kMinRoundGain = 1e-3;    // stop when a round gains < 0.1% D_total
+constexpr int kPostPassMaxRows = 40;      // rows a post-pass move/swap search may visit
+constexpr int kPostPassMaxScan = 64;      // gaps / swap candidates per direction per segment
 constexpr double kMinRoundMaxGain = 1e-2; // ... and < 1% D_max
 
 // Abacus cluster (Spindler et al., ISPD'08) in site units of its segment.
@@ -71,7 +73,7 @@ private:
     void reduceTotal(double cap);
 
     template <class F>
-    void forRowsNear(double gy, F&& f) const;
+    void forRowsNear(double gy, F&& f, int maxRows = 1 << 30) const;
 
     const Design& d_;
     const Layout& L_;
@@ -82,9 +84,9 @@ private:
 };
 
 // Visits rows in order of increasing |row.y - gy| until f(r, dy) returns
-// false.
+// false or maxRows rows have been visited.
 template <class F>
-void Legalizer::forRowsNear(double gy, F&& f) const {
+void Legalizer::forRowsNear(double gy, F&& f, int maxRows) const {
     int nr = L_.numRows();
     int up = static_cast<int>(std::lower_bound(L_.rowY.begin(), L_.rowY.end(), gy) - L_.rowY.begin());
     int down = up - 1;
@@ -94,7 +96,7 @@ void Legalizer::forRowsNear(double gy, F&& f) const {
         int r;
         double dy;
         if (dyU <= dyD) { r = up++; dy = dyU; } else { r = down--; dy = dyD; }
-        if (dy == kInf || !f(r, dy)) break;
+        if (dy == kInf || !f(r, dy) || --maxRows <= 0) break;
     }
 }
 
@@ -358,19 +360,19 @@ bool Legalizer::tryGapMove(int id) {
             int p0 = static_cast<int>(std::upper_bound(v.begin(), v.end(), t,
                                                        [&](double tt, int a) { return tt < k_[a]; }) -
                                       v.begin());
-            for (int p = p0; p <= static_cast<int>(v.size()); ++p) {
+            for (int p = p0, n = 0; p <= static_cast<int>(v.size()) && n < kPostPassMaxScan; ++p, ++n) {
                 long long gl = gapLeft(p);
                 if (dy + std::max(0.0, g.xAt(gl) - c.gx) >= best) break;
                 evalGap(gl, gapRight(p));
             }
-            for (int p = p0 - 1; p >= 0; --p) {
+            for (int p = p0 - 1, n = 0; p >= 0 && n < kPostPassMaxScan; --p, ++n) {
                 long long gr = gapRight(p);
                 if (dy + std::max(0.0, c.gx + c.w - g.xAt(gr)) >= best) break;
                 evalGap(gapLeft(p), gr);
             }
         }
         return true;
-    });
+    }, kPostPassMaxRows);
     if (bestSeg < 0) {
         insertIntoSeg(id, s0, k0);
         return false;
@@ -396,34 +398,42 @@ int Legalizer::trySwap(int id, SwapGoal goal, double cap) {
             const Segment& g = L_.segs[s];
             const std::vector<int>& v = segCells_[s];
             double lim = da - dy;
-            long long kLo = static_cast<long long>(std::floor((a.gx - lim - g.org) / g.sp));
-            auto it = std::lower_bound(v.begin(), v.end(), kLo,
-                                       [&](int c, long long k) { return k_[c] < k; });
-            for (; it != v.end(); ++it) {
-                int b = *it;
-                double xb = g.xAt(k_[b]);
-                if (xb > a.gx + lim) break;
-                if (b == id || std::fabs(d_.cells[b].w - a.w) > kEps) continue;
+            // Candidates within lim of a's global x, scanned outwards from it.
+            auto consider = [&](int b) {
+                if (b == id || std::fabs(d_.cells[b].w - a.w) > kEps) return;
                 const Cell& cb = d_.cells[b];
+                double xb = g.xAt(k_[b]);
                 double na = std::fabs(xb - a.gx) + std::fabs(g.y - a.gy);
                 double nb = std::fabs(xa - cb.gx) + std::fabs(ya - cb.gy);
                 double db = disp(b);
                 double m = std::max(na, nb);
                 if (goal == SwapGoal::kMax) {
-                    if (m >= bestMax && !(m == bestMax && na + nb < bestSum)) continue;
-                    if ((na + nb) - (da + db) > da - m) continue;
+                    if (m >= bestMax && !(m == bestMax && na + nb < bestSum)) return;
+                    if ((na + nb) - (da + db) > da - m) return;
                     bestMax = m;
                     bestSum = na + nb;
                 } else {
                     double gain = (da + db) - (na + nb);
-                    if (gain <= bestGain || m > cap) continue;
+                    if (gain <= bestGain || m > cap) return;
                     bestGain = gain;
                 }
                 bestB = b;
+            };
+            double t = (a.gx - g.org) / g.sp;
+            int p0 = static_cast<int>(std::lower_bound(v.begin(), v.end(), t,
+                                                       [&](int c, double tt) { return k_[c] < tt; }) -
+                                      v.begin());
+            for (int p = p0, n = 0; p < static_cast<int>(v.size()) && n < kPostPassMaxScan; ++p, ++n) {
+                if (g.xAt(k_[v[p]]) > a.gx + lim) break;
+                consider(v[p]);
+            }
+            for (int p = p0 - 1, n = 0; p >= 0 && n < kPostPassMaxScan; --p, ++n) {
+                if (g.xAt(k_[v[p]]) < a.gx - lim) break;
+                consider(v[p]);
             }
         }
         return true;
-    });
+    }, kPostPassMaxRows);
     if (bestB < 0) return -1;
     int sa = seg_[id], sb = seg_[bestB];
     long long ka = k_[id], kb = k_[bestB];

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <deque>
 #include <random>
+#include <utility>
 #include <vector>
 
 #include "Timer.h"
@@ -182,7 +183,8 @@ void Annealer::init(const Placement& legal) {
     double rowH = d_.rows.front().h;
     windowMax_ = std::max(chipW, chipH);
     windowMin_ = 2 * rowH;
-    window_ = std::max(windowMin_, 0.1 * windowMax_);
+    window_ = opt_.initWindowRows > 0 ? std::min(windowMax_, std::max(windowMin_, opt_.initWindowRows * rowH))
+                                      : std::max(windowMin_, 0.1 * windowMax_);
 }
 
 Box Annealer::computeBox(int n) const {
@@ -252,20 +254,33 @@ bool Annealer::proposeAt(int a, double tx, double ty) {
         nch_ = 2;
         return true;
     }
-    // Nearest position with w free sites, scanning outwards.
-    long long lim = std::min<long long>(kMaxGapScan, g.capacity());
-    for (long long dlt = 1; dlt <= lim; ++dlt) {
-        for (long long kk : {k - dlt, k + dlt}) {
-            if (kk < g.kLo || kk + w > g.kHi) continue;
-            if (isFree(s, kk, w, a)) {
-                if (s == seg_[a] && kk == k_[a]) return false;
-                ch_[0] = {a, s, kk, 0, 0};
-                nch_ = 1;
-                return true;
-            }
+    // Nearest run of w free sites (a's own sites count as free): one linear
+    // pass to each side, counting consecutive free sites.
+    auto freeAt = [&](long long i) {
+        int o = occAt(s, i);
+        return o < 0 || o == a;
+    };
+    long long bestK = -1, bestDist = kMaxGapScan + 1;
+    for (long long i = k, run = 0, end = std::min(g.kHi, k + w + kMaxGapScan); i < end; ++i) {
+        run = freeAt(i) ? run + 1 : 0;
+        if (run == w) {
+            bestK = i - w + 1;
+            bestDist = bestK - k;
+            break;
         }
     }
-    return false;
+    for (long long i = k + w - 1, run = 0, end = std::max(g.kLo, k - kMaxGapScan); i >= end; --i) {
+        if (k - i >= bestDist) break;
+        run = freeAt(i) ? run + 1 : 0;
+        if (run == w) {
+            bestK = i;
+            break;
+        }
+    }
+    if (bestK < 0 || (s == seg_[a] && bestK == k_[a])) return false;
+    ch_[0] = {a, s, bestK, 0, 0};
+    nch_ = 1;
+    return true;
 }
 
 // Median of the per-net bounding boxes of a's nets, excluding a itself.
@@ -479,13 +494,13 @@ void Annealer::run(const Placement& legal, Placement& best, SaResult& res) {
             if (dlt > kEps) { sumUp += dlt; ++nUp; }
         }
         double perMove = std::max(1e-7, (Timer::elapsed() - t0) / 4000.0);
-        double T0 = nUp ? -(sumUp / nUp) / std::log(kInitAcceptProb) : 1.0;
+        double T0 = nUp ? -(sumUp / nUp) / std::log(opt_.initAccept) : 1.0;
         double T = T0, Tfrozen = T0 * kFrozenTempRatio;
 
-        long long mps = static_cast<long long>(kMovesPerCellPerStep * static_cast<double>(nMov));
+        long long mps = static_cast<long long>(opt_.movesPerCell * static_cast<double>(nMov));
         if (timed) {
             double budget = (opt_.hardCap - Timer::elapsed()) / perMove;
-            long long fit = static_cast<long long>(budget / kTargetSteps);
+            long long fit = static_cast<long long>(budget / opt_.targetSteps);
             mps = std::max(static_cast<long long>(kMinMovesPerCellPerStep * static_cast<double>(nMov)),
                            std::min(mps, fit));
         }
@@ -498,7 +513,9 @@ void Annealer::run(const Placement& legal, Placement& best, SaResult& res) {
         if (opt_.verbose)
             std::fprintf(stderr, "  SA: T0 %.4g, %lld moves/step, ~%.2f us/move\n", T0, mps, perMove * 1e6);
 
-        std::deque<double> bestHist;
+        // (iteration, best) at the end of each step, for the stall test.
+        std::deque<std::pair<long long, double>> bestHist;
+        const long long patienceMoves = static_cast<long long>(kEarlyStopPatienceMovesPerCell * static_cast<double>(nMov));
         long long iter = 0;
         bool stop = false;
         writeLog(0, T, 1.0);
@@ -540,17 +557,22 @@ void Annealer::run(const Placement& legal, Placement& best, SaResult& res) {
                              res.steps, T, rate, window_, cur_, best_, Timer::elapsed());
             if (stop) break;
 
-            // Early stop: only when cold and best has stalled.
-            bestHist.push_back(best_);
-            if (static_cast<int>(bestHist.size()) > kEarlyStopPatience + 1) bestHist.pop_front();
-            if (rate < kEarlyStopAcceptRate && static_cast<int>(bestHist.size()) == kEarlyStopPatience + 1 &&
-                bestHist.front() - best_ < kEarlyStopRelImprove * best_) {
+            // Early stop: only when cold and best has stalled over the last
+            // kEarlyStopPatience steps and at least patienceMoves moves.
+            bestHist.emplace_back(iter, best_);
+            while (bestHist.size() > 2 && static_cast<int>(bestHist.size()) > kEarlyStopPatience + 1 &&
+                   iter - bestHist[1].first >= patienceMoves)
+                bestHist.pop_front();
+            bool longEnough = static_cast<int>(bestHist.size()) > kEarlyStopPatience &&
+                              iter - bestHist.front().first >= patienceMoves;
+            if (rate < kEarlyStopAcceptRate && longEnough &&
+                bestHist.front().second - best_ < kEarlyStopRelImprove * best_) {
                 res.stopReason = "converged";
                 break;
             }
 
             // VPR-style cooling, sped up if the remaining time demands it.
-            double alpha = rate > 0.96 ? 0.5 : rate > 0.8 ? 0.9 : rate > 0.15 ? 0.95 : 0.8;
+            double alpha = rate > 0.96 ? 0.5 : rate > 0.8 ? 0.9 : rate > 0.15 ? 0.95 : opt_.lowAlpha;
             if (timed && T > Tfrozen) {
                 double stepTime = std::max(1e-6, Timer::elapsed() - stepStart);
                 double stepsLeft = (opt_.hardCap - Timer::elapsed()) / stepTime;
