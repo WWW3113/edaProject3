@@ -1,0 +1,6 @@
+move,attempts,valid_proposals,valid_pct,note
+optimal region (before generalized swap),4496384,2331341,51.9,input005 with --mix 1,0,0 --sa-cap 12
+optimal region (with generalized swap),4085760,2303640,56.4,same setting
+random window,5884928,4003027,68.0,--mix 0,1,0
+adjacent swap,2532252,2519511,99.5,--mix 0,0,1
+in-gap shift,4464252,783066,17.5,--mix 0,0,0

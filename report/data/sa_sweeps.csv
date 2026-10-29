@@ -1,0 +1,28 @@
+experiment,setting,input001,input005,input011,note
+t0_accept,0.2,50291016,813032904,823065852,after free-run speedup; 3 concurrent runs
+t0_accept,0.05,49645362,802012428,808352244,
+t0_accept,0.01,49746762,801134910,807039714,chosen
+t0_accept,0.002,49889994,801342444,808806684,
+window_alpha,win=10% chip / alpha_low=0.8,49746762,800940648,807470688,T0 accept 0.01
+window_alpha,win=10 rows / alpha_low=0.8,49841802,802948038,811467186,
+window_alpha,win=3 rows / alpha_low=0.8,50160474,806670498,815412090,
+window_alpha,win=10% chip / alpha_low=0.95,49491810,797551608,804147018,chosen
+window_alpha,win=10 rows / alpha_low=0.95,49576146,801014412,808340076,
+window_alpha,win=3 rows / alpha_low=0.95,49865622,805539198,814225782,
+alpha_mpc,alpha_low=0.9 / mpc=10,49661868,799206642,806180148,
+alpha_mpc,alpha_low=0.98 / mpc=10,49229100,799097292,807934434,
+alpha_mpc,alpha_low=0.95 / mpc=5,50451306,798212202,802922166,
+alpha_mpc,alpha_low=0.95 / mpc=20,48561324,796980168,801734132,chosen
+steps,mpc=40 / 150 steps (step-count patience),48763458,801218058,804240714,input005 stopped early at 41.5 s
+steps,mpc=20 / 75 steps (step-count patience),48722430,797502966,802680090,
+steps,mpc=20 / 300 steps (step-count patience),49215798,810343314,812733786,large cases stopped early (31.8 s / 44.0 s)
+steps,mpc=20 / 150 steps (move-based patience),48734148,797468550,808842936,chosen
+steps,mpc=20 / 300 steps (move-based patience),49097568,805024548,816112356,no early stop but worse
+mix,40/20/20/20,48725880,799203834,805080336,chosen (optimal/random/adjacent/shift %)
+mix,60/10/15/15,48829560,800538060,804191676,
+mix,30/30/20/20,48569886,799224216,804341922,
+mix,50/20/10/20,48755346,797104920,801346326,
+mix,40/20/35/5,48667452,801627648,806667302,
+genswap,without (rerun),48599598,797124222,802590288,
+genswap,with (run 1),47775900,790593492,792775482,chosen
+genswap,with (run 2),47921886,793440534,796246794,same configuration as run 1: shows the run-to-run spread
