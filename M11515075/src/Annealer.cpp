@@ -57,6 +57,7 @@ private:
     bool proposeRandom(int a);
     bool proposeAdjacentSwap(int a);
     bool proposeShift(int a);
+    void freeSpan(int s, long long k, long long w, int self, long long& lo, long long& hi) const;
     void optimalRegion(int a, double& x1, double& x2, double& y1, double& y2);
 
     double evaluate();          // applies ch_ tentatively to centers, returns delta
@@ -254,6 +255,26 @@ bool Annealer::proposeAt(int a, double tx, double ty) {
         nch_ = 2;
         return true;
     }
+    // Different widths: swap if each cell fits into the other's slot (its
+    // sites plus the free sites around it). Slots of the same segment must
+    // not touch, so the two moves cannot collide.
+    if (b >= 0) {
+        int sa = seg_[a];
+        long long wa_old = ws(a, sa), wb = ws(b, s);
+        long long aLo, aHi, bLo, bHi;
+        freeSpan(sa, k_[a], wa_old, -1, aLo, aHi);
+        freeSpan(s, k_[b], wb, -1, bLo, bHi);
+        long long wbInA = ws(b, sa);
+        bool disjoint = sa != s || aHi < bLo || bHi < aLo;
+        if (disjoint && aHi - aLo >= wbInA && bHi - bLo >= w) {
+            long long ka = std::min(std::max(k, bLo), bHi - w);
+            long long kb = std::min(std::max(k_[a], aLo), aHi - wbInA);
+            ch_[0] = {a, s, ka, 0, 0};
+            ch_[1] = {b, sa, kb, 0, 0};
+            nch_ = 2;
+            return true;
+        }
+    }
     // Nearest run of w free sites (a's own sites count as free): one linear
     // pass to each side, counting consecutive free sites.
     auto freeAt = [&](long long i) {
@@ -281,6 +302,20 @@ bool Annealer::proposeAt(int a, double tx, double ty) {
     ch_[0] = {a, s, bestK, 0, 0};
     nch_ = 1;
     return true;
+}
+
+// [lo, hi): the w sites at k in segment s widened by the free sites on both
+// sides (sites of `self` count as free), at most kMaxGapScan each way.
+void Annealer::freeSpan(int s, long long k, long long w, int self, long long& lo, long long& hi) const {
+    const Segment& g = L_.segs[s];
+    auto freeAt = [&](long long i) {
+        int o = occAt(s, i);
+        return o < 0 || o == self;
+    };
+    lo = k;
+    for (long long lim = std::max(g.kLo, k - kMaxGapScan); lo > lim && freeAt(lo - 1);) --lo;
+    hi = k + w;
+    for (long long lim = std::min(g.kHi, k + w + kMaxGapScan); hi < lim && freeAt(hi);) ++hi;
 }
 
 // Median of the per-net bounding boxes of a's nets, excluding a itself.
@@ -472,9 +507,9 @@ void Annealer::run(const Placement& legal, Placement& best, SaResult& res) {
 
     auto propose = [&](int a) {
         double r = u01_(rng_);
-        if (r < kPOptimal) return proposeOptimal(a);
-        if (r < kPRandom) return proposeRandom(a);
-        if (r < kPAdjacent) return proposeAdjacentSwap(a);
+        if (r < opt_.pOptimal) return proposeOptimal(a);
+        if (r < opt_.pRandom) return proposeRandom(a);
+        if (r < opt_.pAdjacent) return proposeAdjacentSwap(a);
         return proposeShift(a);
     };
     std::uniform_int_distribution<long long> pick(0, nMov > 0 ? nMov - 1 : 0);
@@ -546,6 +581,7 @@ void Annealer::run(const Placement& legal, Placement& best, SaResult& res) {
             }
             res.moves = iter;
             res.accepted += acc;
+            res.proposed += tried;
             ++res.steps;
             // Re-sum to keep floating error from accumulating.
             cur_ = currentTotal();

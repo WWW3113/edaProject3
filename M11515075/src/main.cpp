@@ -45,7 +45,9 @@ void usage(const char* prog) {
               << "  --moves-per-cell M  (tuning) moves per temperature step per cell\n"
               << "  --win0 R        (tuning) initial range window in rows\n"
               << "  --low-alpha A   (tuning) cooling factor below 15% acceptance\n"
-              << "  --target-steps N  (tuning) temperature steps the time budget aims for\n";
+              << "  --target-steps N  (tuning) temperature steps the time budget aims for\n"
+              << "  --mix O,R,A     (tuning) shares of optimal-region, random-window and\n"
+              << "                  adjacent-swap moves; the rest are in-gap shifts\n";
 }
 
 bool parseArgs(int argc, char** argv, Options& o) {
@@ -69,6 +71,17 @@ bool parseArgs(int argc, char** argv, Options& o) {
         else if (i + 1 < argc && a == "--win0") o.saOpt.initWindowRows = std::atof(argv[++i]);
         else if (i + 1 < argc && a == "--low-alpha") o.saOpt.lowAlpha = std::atof(argv[++i]);
         else if (i + 1 < argc && a == "--target-steps") o.saOpt.targetSteps = std::atoi(argv[++i]);
+        else if (i + 1 < argc && a == "--mix") {
+            // shares of optimal-region, random-window and adjacent-swap moves
+            double po = 0, pr = 0, pa = 0;
+            if (std::sscanf(argv[++i], "%lf,%lf,%lf", &po, &pr, &pa) != 3 || po + pr + pa > 1) {
+                std::cerr << "error: --mix expects three shares summing to at most 1\n";
+                return false;
+            }
+            o.saOpt.pOptimal = po;
+            o.saOpt.pRandom = po + pr;
+            o.saOpt.pAdjacent = po + pr + pa;
+        }
         else { std::cerr << "error: unknown option " << a << "\n"; return false; }
     }
     return true;
@@ -139,8 +152,8 @@ int main(int argc, char** argv) {
             best = std::move(sa);
         }
         if (opt.verbose)
-            std::fprintf(stderr, "[%.2fs] stage 2 done: %lld moves, %lld accepted, %d steps, stop: %s\n",
-                         Timer::elapsed(), sr.moves, sr.accepted, sr.steps, sr.stopReason.c_str());
+            std::fprintf(stderr, "[%.2fs] stage 2 done: %lld moves, %lld valid proposals, %lld accepted, %d steps, stop: %s\n",
+                         Timer::elapsed(), sr.moves, sr.proposed, sr.accepted, sr.steps, sr.stopReason.c_str());
     }
 
     if (!writePl(d, legal, opt.out + "_legal.pl") || !writePl(d, best, opt.out + ".pl") ||

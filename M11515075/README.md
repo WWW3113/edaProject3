@@ -95,6 +95,10 @@ Total HPWL (SA): <num>
      gap or swaps with an equal-width cell to lower the pair's total without
      exceeding the current maximum;
    * the L1 reposition again.
+
+   Each post-pass search visits at most 40 rows and 64 gaps or swap
+   candidates per direction and segment, so pathological inputs (e.g. every
+   cell at one point) cannot stall it.
 5. A full legality check runs on the result before anything is written.
 
 ## Stage 2 algorithm (`Annealer.cpp`)
@@ -105,7 +109,9 @@ Total HPWL (SA): <num>
   * 40 % *optimal region*: target the median of the bounding boxes of the
     cell's nets (computed without the cell), limited by the range window;
     the cell moves into free sites there, swaps with an equal-width
-    occupant, or moves to the nearest free run of sites in that segment;
+    occupant, swaps with a different-width occupant when each fits into the
+    other's slot (its sites plus the free sites around it), or moves to the
+    nearest free run of sites in that segment;
   * 20 % *random window*: the same, at a random point within the window;
   * 20 % *adjacent swap*: swap with the right neighbour in the row, keeping
     the pair's span;

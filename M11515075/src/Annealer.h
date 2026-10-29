@@ -41,12 +41,15 @@ struct SaOptions {
     double initWindowRows = sa_tuning::kInitWindowRows;       // experiment override
     double lowAlpha = sa_tuning::kLowAcceptAlpha;             // experiment override
     int targetSteps = sa_tuning::kTargetSteps;                // experiment override
+    double pOptimal = sa_tuning::kPOptimal;   // cumulative move-mix thresholds (experiment override)
+    double pRandom = sa_tuning::kPRandom;
+    double pAdjacent = sa_tuning::kPAdjacent;
     bool verbose = false;
 };
 
 struct SaResult {
     double startHpwl = 0, bestHpwl = 0;
-    long long moves = 0, accepted = 0;
+    long long moves = 0, accepted = 0, proposed = 0;
     int steps = 0;
     std::string stopReason;
 };
