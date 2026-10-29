@@ -39,6 +39,7 @@ with status 1. Optional flags after the two names:
 | `--sa-cap S` | SA stops at S seconds after program start (default 45) |
 | `--sa-log FILE` | write SA progress as CSV (or set env `DP_SA_LOG=FILE`); off by default |
 | `--log-every N` | one CSV row every N attempted moves (default: 10 rows per temperature step) |
+| `--t0-accept P`, `--moves-per-cell M`, `--win0 R`, `--low-alpha A`, `--target-steps N`, `--mix O,R,A` | tuning overrides of the SA constants in `src/Annealer.h`, for experiments only; the defaults are the tuned values |
 
 The CSV columns are `iter,current_hpwl,best_hpwl,temperature,accept_rate`.
 Logging never changes stdout or the output files.
@@ -170,6 +171,25 @@ Total HPWL (SA): <num>
 9. If the rows cannot hold all movable cells, `dp` reports an error and
    exits with status 1 instead of writing an illegal placement.
 
+## Testing
+
+* `tests/toy/` (repository root) holds hand-written cases: several subrows
+  per row, a terminal inside a row, a `terminal_NI` overlapping a row, pins
+  with and without offsets, tabs and `Key:value` without spaces, all 8
+  orientations, a site width of 2 with an odd origin, a fragmentation case
+  that needs the Abacus fallback (toy3) and an infeasible case (toy4).
+* ibm-place2 cases (ibm01/10/12, every utilization variant) were built with
+  `convert_ibm.py` from Dragon placements plus Gaussian noise (mild: σ = 1 row
+  / 10 sites, harsh: 3 rows / 30 sites), since the benchmark `.pl` files
+  place every cell at the origin.
+* Every result is checked by `tools/checker.py`, written independently of
+  the C++ code.
+
+## Submission
+
+Only this directory is submitted (zipped as `M11515075.zip`), without
+`build/`: `src/`, `CMakeLists.txt`, `README.md`.
+
 ## Tools (outside this directory, in the repository's `tools/`)
 
 * `tools/checker.py IN OUT [--stdout FILE]` — independent legality and
@@ -182,7 +202,12 @@ Total HPWL (SA): <num>
 * `tools/run_all.sh CASES_DIR [OUT_DIR] [-- dp flags]` — builds dp, runs every
   `inputXXX` the way the grader does (inputs copied next to `dp`, run from
   that directory), checks each result and writes `results.csv` / `results.md`
-  with time, peak memory, D_total, D_max and HPWL before and after SA.
+  with time, peak memory, D_total, D_max and HPWL before and after SA. When
+  the case directory also holds `inputXXX.ref.pl` (written by
+  `convert_ibm.py --gp`), reference columns give that known legal
+  placement's D_total, D_max and HPWL.
+* `tools/ref_metrics.py IN REF_PL` — displacement and HPWL of a reference
+  placement against a case's input placement (used by `run_all.sh`).
 * `tools/plot_sa.py run.csv -o sa.png` — current and best-so-far HPWL vs
   attempted iterations, with temperature in a panel below (needs matplotlib).
 * `tools/plot_placement.py IN OUT -o place.png [--zoom X0 Y0 X1 Y1] [--color-disp]`
