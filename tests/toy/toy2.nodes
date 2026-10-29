@@ -1,0 +1,20 @@
+UCLA nodes 1.0
+# edge cases: tabs, no spaces around ':', terminal_NI
+NumNodes:16
+NumTerminals   :	5
+c0	5	10
+c1  3  10
+c2 8 10
+c3	4	10
+c4 6 10
+c5 2 10
+c6 7 10
+c7 5 10
+c8 3 10
+c9 4 10
+c10 6 10
+blk	20	20	terminal
+ni1 10 10 terminal_NI
+p1 5 5 terminal
+p2 5 5 terminal
+p3 4 4 terminal

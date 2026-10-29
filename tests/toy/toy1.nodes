@@ -1,0 +1,13 @@
+UCLA nodes 1.0
+# toy1
+
+NumNodes : 7
+NumTerminals : 2
+
+a 4 8
+b 6 8
+c 3 8
+d 5 8
+e 2 8
+p1 2 2 terminal
+p2 2 2 terminal
