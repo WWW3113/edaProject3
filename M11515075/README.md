@@ -165,6 +165,10 @@ Total HPWL (SA): <num>
 * `tools/checker.py IN OUT [--stdout FILE]` — independent legality and
   metric checker.
 * `tools/gen_synth.py OUT_BASE --cells N` — synthetic test case generator.
+* `tools/convert_ibm.py SRC BENCH VARIANT OUT_BASE [--gp PL --sigma-rows R --sigma-sites S]`
+  — turn an ibm-place2 variant into an `inputXXX` case; macros become fixed
+  terminals, and `--gp` substitutes (perturbed) movable positions from
+  another placement of the same netlist.
 * `tools/plot_sa.py run.csv -o sa.png` — current and best-so-far HPWL vs
   attempted iterations, with temperature in a panel below (needs matplotlib).
 * `tools/plot_placement.py IN OUT -o place.png [--zoom X0 Y0 X1 Y1] [--color-disp]`
