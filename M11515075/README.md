@@ -5,7 +5,7 @@ Two-stage detailed placer for GSRC Bookshelf designs:
 1. **Stage 1 – Legalization**: legal placement minimizing total and maximum
    displacement from the global placement (see below).
 2. **Stage 2 – Simulated annealing**: minimizes total HPWL while keeping the
-   placement legal at every step. *(in progress)*
+   placement legal at every step (see below).
 
 Only the C++17 standard library is used.
 
@@ -33,6 +33,15 @@ with status 1. Optional flags after the two names:
 | `-v`, `--verbose` | progress, timing and per-step displacement on stderr |
 | `--no-l1` | skip the per-segment L1 reposition (for experiments) |
 | `--no-postpass` | skip the displacement post-pass (for experiments) |
+| `--no-sa` | skip Stage 2; `<out>.pl` is the Stage 1 result |
+| `--seed N` | SA random seed (default 1) |
+| `--iters N` | fixed SA move budget: the schedule ignores the clock, so a run is bit-for-bit reproducible (the 45 s safety cap still applies) |
+| `--sa-cap S` | SA stops at S seconds after program start (default 45) |
+| `--sa-log FILE` | write SA progress as CSV (or set env `DP_SA_LOG=FILE`); off by default |
+| `--log-every N` | one CSV row every N attempted moves (default: 10 rows per temperature step) |
+
+The CSV columns are `iter,current_hpwl,best_hpwl,temperature,accept_rate`.
+Logging never changes stdout or the output files.
 
 ## Output
 
@@ -88,6 +97,44 @@ Total HPWL (SA): <num>
    * the L1 reposition again.
 5. A full legality check runs on the result before anything is written.
 
+## Stage 2 algorithm (`Annealer.cpp`)
+
+* **State**: one occupancy array per free segment (site → cell). Every move
+  is checked locally against it, so the placement is legal at all times.
+* **Moves** (cell picked uniformly at random):
+  * 40 % *optimal region*: target the median of the bounding boxes of the
+    cell's nets (computed without the cell), limited by the range window;
+    the cell moves into free sites there, swaps with an equal-width
+    occupant, or moves to the nearest free run of sites in that segment;
+  * 20 % *random window*: the same, at a random point within the window;
+  * 20 % *adjacent swap*: swap with the right neighbour in the row, keeping
+    the pair's span;
+  * 20 % *shift*: move within the free gap around the cell, towards its
+    optimal x half of the time.
+* **Incremental HPWL**: every net caches its bounding box and the number of
+  pins on each edge; a move only touches the nets of the moved cells, and a
+  box is recomputed from scratch only when an edge loses its last pin (or
+  for nets with fewer than 12 pins, where recomputing is cheaper).
+* **Schedule**: T0 is set so that about 20 % of sampled uphill moves would be
+  accepted. Cooling follows the VPR rule (α = 0.5 / 0.9 / 0.95 / 0.8 by
+  acceptance rate). It is sped up when needed so that T reaches 1e-4·T0 by
+  the 45 s cap. The range window shrinks or grows with the acceptance rate
+  (target 44 %). The moves per step are 10 × #cells, reduced on large designs
+  so about 150 steps fit in the time budget. Moves with zero HPWL change are
+  accepted but do not count toward the acceptance rate.
+* **Stopping**: hard cap at 45 s after program start, or early when the
+  acceptance rate is below 5 % and best-so-far improved by less than
+  0.01 % over the last 5 steps. All knobs are constants in `Annealer.h`.
+* **Best-so-far**: an undo journal records each cell changed since the last
+  snapshot (once per cell, via a dirty flag). Whenever current HPWL beats
+  the best, only those cells are copied into the stored best placement, so
+  the reported best always corresponds to a saved placement. The output is
+  that placement, with its HPWL recomputed from scratch for stdout. It is
+  legality-checked before writing; if it fails, the Stage 1 result is used.
+* **Reproducibility**: fixed seed (`--seed`). The default schedule is
+  time-driven, so results can differ between machines of different speed.
+  `--iters N` removes the clock from the schedule.
+
 ## Assumptions
 
 1. All movable cells are one row tall; a legal cell's y equals its row's
@@ -118,3 +165,7 @@ Total HPWL (SA): <num>
 * `tools/checker.py IN OUT [--stdout FILE]` — independent legality and
   metric checker.
 * `tools/gen_synth.py OUT_BASE --cells N` — synthetic test case generator.
+* `tools/plot_sa.py run.csv -o sa.png` — current and best-so-far HPWL vs
+  attempted iterations, with temperature in a panel below (needs matplotlib).
+* `tools/plot_placement.py IN OUT -o place.png [--zoom X0 Y0 X1 Y1] [--color-disp]`
+  — global / legal / SA placements side by side.

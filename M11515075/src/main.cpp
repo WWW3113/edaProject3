@@ -2,7 +2,9 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
 
+#include "Annealer.h"
 #include "Design.h"
 #include "Layout.h"
 #include "Legalizer.h"
@@ -21,6 +23,8 @@ struct Options {
     bool verbose = false;
     bool l1 = true;
     bool postPass = true;
+    bool sa = true;
+    SaOptions saOpt;
 };
 
 void usage(const char* prog) {
@@ -30,11 +34,18 @@ void usage(const char* prog) {
               << "options:\n"
               << "  -v, --verbose   progress and timing on stderr\n"
               << "  --no-l1         skip the per-segment L1 reposition (Stage 1)\n"
-              << "  --no-postpass   skip the displacement post-pass (Stage 1)\n";
+              << "  --no-postpass   skip the displacement post-pass (Stage 1)\n"
+              << "  --no-sa         skip Stage 2 (output the legal placement)\n"
+              << "  --seed N        SA random seed (default 1)\n"
+              << "  --iters N       fixed SA move budget; schedule ignores the clock\n"
+              << "  --sa-cap S      SA stops S seconds after program start (default 45)\n"
+              << "  --sa-log FILE   write SA progress CSV (also: env DP_SA_LOG)\n"
+              << "  --log-every N   CSV row every N attempted moves\n";
 }
 
 bool parseArgs(int argc, char** argv, Options& o) {
     if (argc < 3) return false;
+    if (const char* env = std::getenv("DP_SA_LOG")) o.saOpt.logPath = env;
     o.in = argv[1];
     o.out = argv[2];
     for (int i = 3; i < argc; ++i) {
@@ -42,6 +53,12 @@ bool parseArgs(int argc, char** argv, Options& o) {
         if (a == "-v" || a == "--verbose") o.verbose = true;
         else if (a == "--no-l1") o.l1 = false;
         else if (a == "--no-postpass") o.postPass = false;
+        else if (a == "--no-sa") o.sa = false;
+        else if (i + 1 < argc && a == "--seed") o.saOpt.seed = std::strtoull(argv[++i], nullptr, 10);
+        else if (i + 1 < argc && a == "--iters") o.saOpt.iters = std::atoll(argv[++i]);
+        else if (i + 1 < argc && a == "--sa-cap") o.saOpt.hardCap = std::atof(argv[++i]);
+        else if (i + 1 < argc && a == "--sa-log") o.saOpt.logPath = argv[++i];
+        else if (i + 1 < argc && a == "--log-every") o.saOpt.logEvery = std::atoll(argv[++i]);
         else { std::cerr << "error: unknown option " << a << "\n"; return false; }
     }
     return true;
@@ -98,8 +115,23 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // ---- Stage 2: not implemented yet, keep the legal placement.
+    // ---- Stage 2: simulated annealing
     Placement best = legal;
+    if (opt.sa) {
+        opt.saOpt.verbose = opt.verbose;
+        SaResult sr;
+        Placement sa;
+        anneal(d, layout, legal, opt.saOpt, sa, sr);
+        msg.clear();
+        if (long long bad = verifyLegal(d, layout, sa, msg)) {
+            std::cerr << "internal error: SA result has " << bad << " violations, keeping Stage 1\n" << msg;
+        } else if (totalHpwl(d, sa) <= totalHpwl(d, legal)) {
+            best = std::move(sa);
+        }
+        if (opt.verbose)
+            std::fprintf(stderr, "[%.2fs] stage 2 done: %lld moves, %lld accepted, %d steps, stop: %s\n",
+                         Timer::elapsed(), sr.moves, sr.accepted, sr.steps, sr.stopReason.c_str());
+    }
 
     if (!writePl(d, legal, opt.out + "_legal.pl") || !writePl(d, best, opt.out + ".pl") ||
         !writeAuxAndCopies(d, opt.out, err)) {
