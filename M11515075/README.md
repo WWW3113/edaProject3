@@ -169,6 +169,10 @@ Total HPWL (SA): <num>
   — turn an ibm-place2 variant into an `inputXXX` case; macros become fixed
   terminals, and `--gp` substitutes (perturbed) movable positions from
   another placement of the same netlist.
+* `tools/run_all.sh CASES_DIR [OUT_DIR] [-- dp flags]` — builds dp, runs every
+  `inputXXX` the way the grader does (inputs copied next to `dp`, run from
+  that directory), checks each result and writes `results.csv` / `results.md`
+  with time, peak memory, D_total, D_max and HPWL before and after SA.
 * `tools/plot_sa.py run.csv -o sa.png` — current and best-so-far HPWL vs
   attempted iterations, with temperature in a panel below (needs matplotlib).
 * `tools/plot_placement.py IN OUT -o place.png [--zoom X0 Y0 X1 Y1] [--color-disp]`
