@@ -1,0 +1,6 @@
+UCLA nets 1.0
+NumNets : 1
+NumPins : 2
+NetDegree : 2 n0
+ A I
+ D O

@@ -91,7 +91,7 @@ def main():
             else:
                 x, y = rnd.uniform(0, L - widths[i]), rnd.uniform(0, core_h - H)
             x = min(max(x, -0.01 * L), L)
-            y = min(max(y, -0.01 * core_h), core_h)
+            y = min(max(y, -0.01 * core_h), core_h - H)
             if not in_macro(x, y, widths[i]):
                 break
         gx[i], gy[i] = round(x, 2), round(y, 2)
